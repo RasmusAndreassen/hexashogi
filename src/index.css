@@ -11,3 +11,10 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+@font-face {
+  font-family: 'LigatureSymbols';
+  src: url('/public/LigatureSymbols-2.11.ttf');
+  font-weight: normal;
+  font-style: normal;
+}
