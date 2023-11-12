@@ -1,25 +1,26 @@
 import { useState } from 'react';
 import './App.css';
 import Board from './Board';
-import { BoardState, Color, History } from '../resources/types';
+import { BoardState, Player, History, } from '../resources/types';
 import MoveLog from './MoveLog';
+import { Piece } from '../resources/pieces';
 
 function App() {
-  const [turn, setTurn] = useState<Color>(Color.white);
+  const [turn, setTurn] = useState<Player>(Player.ou);
   const [history, setHistory] = useState<History>([]);
 
-  function nextTurn (move:string, state:BoardState) {
+  function nextTurn (move:string, board:BoardState, hands:{[P in Player]:Piece[]}) {
     switch (turn) {
-      case Color.black:
-        setTurn(Color.white);
+      case Player.gyoku:
+        setTurn(Player.ou);
       break;
-      case Color.white:
-        setTurn(Color.black);
+      case Player.ou:
+        setTurn(Player.gyoku);
       break;
     }
     setHistory([
       ...history,
-      {move, state}
+      {move, state:{board, hands}}
     ])
   }
 

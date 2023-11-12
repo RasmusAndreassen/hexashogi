@@ -1,0 +1,46 @@
+.piece.choosing {
+	pointer-events: all !important;
+	cursor: pointer;
+	scale: 0.5;
+	--translate: 15px;
+}
+
+.piece.choosing.left {
+	translate: calc(-1 * var(--translate));
+}
+
+
+.piece.choosing.right {
+	translate: var(--translate);
+}
+
+.piece.choosing:hover {
+	scale: 0.65;
+	--translate: 12px;
+}
+
+.piece.ghost {
+	opacity: 0.75;
+}
+.piece>polygon{
+	fill: hsl(32, 70%, 71%);
+}
+.piece text{
+	writing-mode: vertical-rl;
+	font-family: LigatureSymbols;
+	pointer-events: none;
+	text-anchor: middle;
+	
+}
+.piece.nari text{
+	font-family: kouzan;
+	font-size: 25pt;
+	stroke: red;
+	fill: red;
+}
+
+.piece.highlight>polygon{
+	stroke: yellow;
+	stroke-width: 3;
+}
+

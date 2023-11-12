@@ -2,20 +2,16 @@ import { Piece } from "./pieces";
 
 type Coord = [q:number, r:number];
 
-enum Color {
-	white,
-	black,
+enum Player {
+	ou,
+	gyoku,
 }
-
-interface BasePiece {
-	repr: string;
-	moves: string[];
-}
-
 
 type TileAttributes = {
 	highlighted?: boolean;
-	piece: Piece|null;
+	piece: null|Piece;
+	extra?: Piece;
+	update?: (q: number, r: number, nari: boolean)=>void;
 }
 
 interface BoardState {
@@ -24,7 +20,25 @@ interface BoardState {
 	}
 }
 
-type History = {move:string,state:BoardState}[]
+interface PlayerPieces {
+	board:{piece:Piece,position:Coord}[];
+	hand:Piece[];
+}
 
-export type { Coord, BasePiece, TileAttributes, BoardState, History};
-export { Color, Player};
+interface PlayerState {
+	pieces:PlayerPieces,
+	setPieces:(pieces:PlayerPieces)=>void,
+}
+
+type History = {
+	move:string,
+	state: {
+		board:BoardState,
+		hands: {
+			[P in Player]: PlayerPieces['hand'];
+		}
+	}
+}[]
+
+export type { Coord, TileAttributes, BoardState, History, PlayerPieces, PlayerState, };
+export { Player };

@@ -1,0 +1,38 @@
+.tile {
+	fill: hsl(40, 100%, 87%);
+}
+
+.tile>polygon {
+	stroke: black;
+	stroke-width: 1;
+}
+
+.tile.check>polygon{
+	fill: hsl(0, 70%, 50%);
+}
+/* .tile.field>polygon{
+	fill: hsl(30, 70%, 70%);
+} */
+.tile.immovable .piece polygon{
+	filter: grayscale(0.3);
+}
+.tile.checking .piece polygon{
+	stroke: hsl(0, 70%, 55%);
+	stroke-width: 5px;
+}
+
+.tile.focus>polygon{
+	fill: hsl(260, 70%, 50%);
+}
+
+.tile:hover {
+	filter: hue-rotate(20);
+}
+
+.tile.highlight>polygon {
+fill: hsl(56, 70%, 71%);
+}
+
+.tile .piece {
+	pointer-events: none;
+}
