@@ -1,4 +1,4 @@
-import { Piece } from "./pieces";
+import { Piece, PieceBack, PieceFace, PieceType } from "./pieces";
 
 type Coord = [q:number, r:number];
 
@@ -8,37 +8,56 @@ enum Player {
 }
 
 type TileAttributes = {
-	highlighted?: boolean;
+	classNames: string[];
 	piece: null|Piece;
-	extra?: Piece;
-	update?: (q: number, r: number, nari: boolean)=>void;
 }
 
-interface BoardState {
-	[q:number]:{
-		[r:number]: TileAttributes;
-	}
-}
-
-interface PlayerPieces {
-	board:{piece:Piece,position:Coord}[];
-	hand:Piece[];
-}
-
-interface PlayerState {
-	pieces:PlayerPieces,
-	setPieces:(pieces:PlayerPieces)=>void,
-}
-
-type History = {
-	move:string,
-	state: {
-		board:BoardState,
-		hands: {
-			[P in Player]: PlayerPieces['hand'];
+interface PieceState {
+	board: {
+		[q:number]: {
+			[r:number]: null|Piece;
+		}
+	};
+	players: {
+		[P in Player]: {
+			king:Coord;
+			board:Coord[];
+			hand:Piece<false>[];
 		}
 	}
-}[]
+}
 
-export type { Coord, TileAttributes, BoardState, History, PlayerPieces, PlayerState, };
-export { Player };
+
+interface GameState {
+	pieces: PieceState;
+	turn: Player;
+	moveCode: MoveCode;
+	ordinal: number;
+}
+
+interface Territory {
+	area: Map<number,number|number[]>;
+	obstructed: boolean;
+}
+
+type Optional<T extends string> = T|"";
+
+type Move = [src?:Coord|number, dst?:Coord, captured?:Piece|null, uniq?:boolean, nari?:boolean]
+
+type MoveLabel = `${PieceFace}${Optional<'n'>}` | PieceBack;
+type MoveCoord = `${number},${number}`;
+
+type MoveSpace = `${MoveLabel}${Optional<`(${MoveCoord})`>}${MoveCoord}${Optional<"*">}`;
+type MovePlace = `${PieceFace}${MoveCoord}+`
+               | `香車[${'i'|'-j'|'-k'}]${MoveCoord}+`;
+
+type MoveCode = MoveSpace
+          | MovePlace;
+
+interface Action<P> {
+	type: string;
+	payload: P;
+}
+
+export type { PieceState, MoveCode, Move, MovePlace, MoveSpace, TileAttributes, Territory, GameState, Coord, Action, };
+export { Player, };

@@ -1,3 +1,27 @@
 #board{
 	background: maroon;
+	& #content {
+		transition: rotate 0.4s ease-in-out;
+
+		.gyoku & {
+			rotate: 180deg;
+		}
+
+		.hand.ou {
+			translate: 0 420px;
+
+			.piece {
+				translate: calc(300px - calc(var(--i) * 50px));
+			}
+		}
+
+		.hand.gyoku {
+			translate: 0 -420px;
+
+			.piece {
+				translate: calc(-300px + calc(var(--i) * 50px));
+			}
+		}
+	}
 }
+

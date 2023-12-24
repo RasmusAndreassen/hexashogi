@@ -1,57 +1,55 @@
 import type { Piece as _Piece } from "../resources/pieces"
 import './Piece.css'
+import { GameContext } from './GameContext';
+import { useContext } from "react";
+import { Coord, Player } from "../resources/types";
+import { BoardContext } from "./BoardContext";
+import { arrayEq } from "../resources/util";
 
 interface Props {
+	position: Coord|number;
 	piece: _Piece;
-	rotate?: number;
-	x?:number;
-	y?: number;
 	onMouseEnter?: ()=>void;
-	onClick?: ()=>void;
-	className?:string;
-	scale?:number;
+	onClick?: (p:Coord|number)=>void;
+	classNames?:string[];
+	i?: number;
 }
 
 
-function Piece({ piece, rotate, x, y, onClick, onMouseEnter, className:classes, scale, }: Props) {
-	
-	const className = ['piece']
-	const { type, nari, repr, ghost, } = piece;
-	let squeeze = 1;
-	if (type === 'o') {
-		rotate = rotate ?? 0;
-		switch (piece.direction) {
-			case '-j':
-				rotate -= 60;
-				squeeze = 0.96;
-			break;
-			case '-k':
-				rotate += 60;
-				squeeze = 0.96;
-			break;
-		}
+function Piece({ piece, onClick, onMouseEnter, classNames, i, position, }: Props) {
+	classNames = ['piece', ...classNames??[]];
+	const { owner, type, nari, repr, } = piece;
+	let { turn, move } = useContext(GameContext);
+	let { threatening, movable, } = useContext(BoardContext);
+	if (type === 'o' && piece.direction) {
+		classNames.push(piece.direction);
 	}
-
-	scale = scale ?? 1
 
 	let fontFamily;
-	if (classes)
-		className.push(classes);
-	if (ghost)
-		className.push('ghost');
-	if (nari) {
-		className.push('nari');
-		if (type === 'g' || type === 'e')
-			fontFamily = 'hkgyos'
-	}
+	classNames.push(Player[owner])
+	if (nari)
+		classNames.push('nari');
+	// if (move)
+	// 	classNames.push('selected');
+	if (piece.owner === turn && !movable.some(pos => arrayEq(pos, position as Coord)))
+		classNames.push('immovable');
+	else if (threatening.includes(piece as any))
+		classNames.push('oute');
+
 	return (
 		<g 
-			className={className.join(' ')}
-			transform={`rotate(${rotate??0}) translate(${x??0},${y??0}) scale(${squeeze*scale},${scale})`}
-			{...{onClick, onMouseEnter}}
+			style={{'--i':i} as any}
+			className={classNames.join(' ')}
+			onClick={e => {
+				if (onClick) {
+					e.stopPropagation();
+					onClick(position);
+				}
+				}}
+			{...{onMouseEnter, type, }}
 			>
-			<polygon points='25,22 20,-19 0,-30 -20,-19 -25,22' />
-			<text textAnchor="middle" dominantBaseline='center' fill='black' fontSize={20} style={{fontFamily}}>{repr}</text>
+			<polygon points='20,18 15,-15 0,-23 -15,-15 -20,18' />
+			<text textAnchor="middle" dominantBaseline='center' fill='black' fontSize={17} style={{fontFamily}}>{repr}</text>
 		</g>);
 }
 

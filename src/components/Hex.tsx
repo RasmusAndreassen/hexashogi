@@ -1,87 +1,57 @@
-import { Player, TileAttributes } from "../resources/types";
 import './Hex.css';
-import Piece from "./Piece";
 
-type Props = {
-	className?:string,
-	turn: Player,
+interface Props {
 	q: number,
 	r: number,
-	onClick: () => void,
-	onHover: (q:number,r:number) => void
+	onClick?: () => void,
+	onHover?: () => void,
+	children?:JSX.Element|JSX.Element[],
+	classNames?: string[]
 }
-	& TileAttributes;
 
 function Hex(props: Props) {
-	let { q, r, turn, highlighted, onClick, onHover, className } = props;
+	let { q, r, onClick, onHover, classNames, children } = props;
+
+	const { cos, sin, PI } = Math
 
 	const cradius = 40;
-	const iradius = Math.sin(Math.PI / 3) * cradius;
+	const iradius = sin(PI / 3) * cradius;
 
-	let x = q * 3 / 2 * cradius;
-	let y = 2 * iradius * r + iradius * q;
+	let x = (q * 3 / 2 * cradius).toPrecision(6);
+	let y = (2 * iradius * r + iradius * q).toPrecision(6);
 
-	if (turn === Player.gyoku) {
-		x = -x; y = -y;
-	}
 
 	let points = [];
 
 	for (let i = 0; i < 6; i++) {
-		let angle = i * Math.PI / 3;
+		let angle = i * PI / 3;
 
-		let x = Math.cos(angle) * cradius;
-		let y = Math.sin(angle) * cradius;
+		let x = cos(angle) * cradius;
+		let y = sin(angle) * cradius;
 
 		points.push([x, y]);
 	}
 
-	let { piece, extra, update, } = props;
-	let rotate = ((Array.isArray(piece)? piece[0].allegiance : piece?.allegiance) === turn)? 0 : 180;
-	
-	const classNames = ['tile']
-	if (className)
-		classNames.push(className);
-	if (highlighted)
-		classNames.push('highlight');
 
-	
-	
+
+	classNames = ['tile', ...classNames??[]];
+
 	return (
-		<g className={classNames.join(' ')} transform={`translate(${x},${y})`} >
+		<g className={classNames.join(' ')} style={{translate: `${x}px ${y}px`}} >
 			<polygon
 				points={points.map(([x, y]) => `${x},${y}`).join(' ')}
 				onMouseEnter={() => {
-					onHover(q,r);
+					if (onHover)
+						onHover();
 				}}
-				{...{onClick}}
+				onClick={e => {
+					e.stopPropagation();
+
+					if (onClick)
+						onClick();
+				}}
 			/>
-			{!!extra && !!piece? 
-			<>
-				<Piece 
-					className="choosing left"
-					onMouseEnter={()=> update!(q,r,false)}
-					{...{
-						onClick,
-						piece,
-						rotate,
-					}}/>
-				<Piece 
-					className="choosing right"
-					onMouseEnter={()=> update!(q,r,true)}
-					{...{
-						onClick,
-						piece:extra,
-						rotate,
-					}}/>
-			</>:
-			!!piece? 
-				<Piece 
-					{...{
-					piece,
-					rotate,
-					}}/>:
-				null}
+			{children}
 		</g>
 	);
 }

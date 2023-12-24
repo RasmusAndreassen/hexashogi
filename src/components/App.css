@@ -1,26 +1,43 @@
 .App {
-  text-align: center;
+	display: grid;
+	place-content: start;
+
+	overflow: hidden;
+
+	width: 100dvw;
+	height: 100dvh;
+
+	@media (width <= calc(75dvh + 8em)) and (aspect-ratio <= 1/1) {
+		grid-template: min-content 1fr / min(100%, 75dvh, calc(100dvh - 7rem));
+		justify-content: start;
+
+	}
+
+	@media (width > calc(75dvh + 8em)) or (aspect-ratio > 1/1) {
+		grid-template: 100% / minmax(auto, 85dvh) minmax(7em, 1fr);
+	}
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
+#wincard {
+	position: fixed;
+	place-self: center;
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
+	width: 54dvw;
+	height: 16dvw;
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
+	background-color: gold;
+	color: crimson;
 
+	font-size: 9dvw;
+	font-weight: bold;
+	text-align: center;
+	line-height: 16dvw;
+
+	z-index: 1;
+
+
+	~* {
+		filter: grayscale(1);
+		pointer-events: none;
+	}
+}
