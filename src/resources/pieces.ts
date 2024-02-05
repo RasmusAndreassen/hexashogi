@@ -1,6 +1,7 @@
 import { Player } from './types';
 import { DeepWritable } from './util';
-const piecePrimitives = {
+
+const _primitives = {
 	O: {
 		repr: '王将',
 		moves: ['ih', 'i-jh'],
@@ -60,110 +61,126 @@ const piecePrimitives = {
 	},
 } as const;
 
-type PP = typeof piecePrimitives;
+type PP = typeof _primitives;
 
-const primitives = piecePrimitives as PiecePrimitives;
+export const primitives = _primitives as Primitives;
 
-type PiecePrimitives = {
-	[K in keyof PP]: PP[K] extends {nari:any}?
-		PP[K]['nari'] extends {moves:any[]}?
+type Primitives = {
+	[K in keyof PP]: K extends type.Nari?
+		K extends type.SpecialNari?
 			PP[K]
 		:PP[K] & {
 			nari:PP[K]['nari'] & {
 				moves: undefined
 			}
 		}
-	:{nari:undefined} & PP[K];
+	:PP[K] &{
+		nari: undefined;
+	};
 }
 
 
-type PieceType = keyof PP;
+export namespace type {
+	export type Type = keyof Primitives;
+	export type Nari = keyof FilterProperties<PP, {nari:any}>;
+	export type SpecialNari = keyof FilterProperties<PP, {nari:{moves:any}}>;
+};
+export namespace label {
+	export type Face<T extends  type.Type = type.Type> = PP[T]['repr'];
+	export type Back<T extends  type.Nari = type.Nari> = PP[T]['nari']['repr'];
+	export type Label<P extends Piece = Piece> = P extends Piece<true>? Back<P['type']>: Face<P['type']>;
+}
 
-type PieceNari = keyof FilterProperties<PP, {nari:any}>;
-type PieceNariWMoves = keyof FilterProperties<PP, {nari:{moves:any}}>
+type Moves<P extends Piece> = P extends Piece<true,type.SpecialNari>? PP[P['type']]['nari']['moves']: P extends type.Nari? PP['k']['moves']: PP[P['type']]['moves'];
 
 type FilterProperties<T, U> = {
 	[K in keyof T as T[K] extends U? K: never]: T[K];
 };
 
-type PieceFace<T extends PieceType = PieceType> = PP[T]['repr'];
-type PieceBack<T extends PieceNari = PieceNari> = PP[T]['nari']['repr'];
-type PieceLabel<T extends PieceType = PieceType> = T extends PieceNari? PieceFace<T> | PieceBack<T>: PieceFace<T>;
 
-type PieceMoves<T extends PieceType = PieceType> = T extends PieceNariWMoves? PP[T]['moves'] | PP[T]['nari']['moves']: PP[T]['moves'];
-
-interface Piece<
+export interface Piece<
 	N extends boolean = boolean,
-	T extends PieceType = PieceType,> {
-	repr: N extends true?
-		T extends PieceNari? PieceBack<T>: never: N extends false? PieceFace<T>: PieceLabel<T>;
+	T extends (N extends true? type.Nari: type.Type) = (N extends true? type.Nari: type.Type),> {
 	nari: N;
 	type: T;
 	owner: Player;
-	moves: DeepWritable<N extends true?
-		T extends PieceNari?
-			PP[T]['nari'] extends {moves:any[]}?
-				PP[T]['nari']['moves']
-				:PP['k']['moves']
-			:never
-		:N extends false?
-			PP[T]['moves']:
-			PieceMoves<T>>;
 	direction?: T extends 'o'? 'i'|'-j'|'-k': never;
 }
 
+export namespace operations {
 
-function newPiece<T extends PieceType>(type:T, owner:Player): Piece<false,T> {
-	return {
-		owner,
-		type,
-		repr: primitives[type].repr,
-		moves: [...primitives[type].moves] as DeepWritable<typeof primitives[T]['moves']>,
-		nari: false,
+	export function newPiece<T extends type.Type>(type:T, owner:Player): Piece<false,T> {
+		return {
+			owner,
+			type,
+			nari: false,
+		}
+	}
+
+	export function isNari<T extends type.Type>(piece:Piece<boolean,T>): piece is Piece<true,T & type.Nari> {
+		return piece.nari;
+	}
+
+	export function notNari<T extends type.Type>(piece:Piece<boolean,T>): piece is Piece<false,T> {
+		return !piece.nari;
+	}
+
+	function isSpecNari<T extends type.Type>(piece:Piece<boolean,T>): piece is Piece<true,T & type.SpecialNari> {
+		return piece.nari && ['H', 'K'].includes(piece.type);
+	}
+
+	export function canNari(piece:Piece<false>): piece is Piece<false,type.Nari> {
+		return primitives[piece.type].nari !== undefined;
+	}
+
+	export function repr<P extends Piece>(piece:P) {
+		let repr;
+		if (isNari(piece))
+			repr = primitives[piece.type].nari.repr;
+		else
+			repr = primitives[piece.type].repr;
+
+		return repr as label.Label<P>;
+	}
+
+	export function moves<P extends Piece>(piece:P) {
+		let moves;
+		if (isSpecNari(piece))
+			moves = primitives[piece.type].nari.moves;
+		else if (isNari(piece)) {
+			moves = primitives['k'].moves;
+		} else if (piece.type === 'o' && piece.direction) {
+			moves = [piece.direction + '+']
+		} else {
+			moves = primitives[piece.type].moves;
+		}
+		return moves as Moves<P>;
+	}
+
+	export function naru(piece:Piece<false>): Piece<true> {
+		const { type, owner, } = piece;
+		if (!canNari(piece))
+			throw new Error(`${repr(piece)}は成れない`);
+
+		return {
+			owner,
+			type: type as type.Nari,
+			nari: true,
+			};
+	}
+
+	export function capture<T extends type.Type>(piece:Piece<boolean,T>): Piece<false,T> {
+		const { type, owner, } = piece;
+		return {
+			nari: false,
+			type,
+			owner: Number(!owner),
+		};
+	}
+
+	export function clone(piece:Piece): typeof piece {
+		return {
+			...piece,
+		};
 	}
 }
-
-
-function naru(piece:Piece<false>): Piece<true> {
-	const { type, } = piece;
-	const { nari, } = primitives[type];
-	if (!nari)
-		throw new Error(`${piece.repr}は成れない`);
-
-	const { repr, moves, } = nari;
-
-	
-
-	return {
-		...piece,
-		type: type as PieceNari,
-		moves: moves ?? ["ih", "i-j", "i-k", "j-k", "k-j"],
-		nari: true,
-		repr,
-		direction: undefined,
-		};
-}
-
-function capture<T extends PieceType>(piece:Piece<boolean,T>): Piece<false,T> {
-	const { type, owner, } = piece;
-	const { repr, moves, } = primitives[type];
-	return {
-		...piece,
-		nari: false,
-		repr,
-		moves: [...moves] as DeepWritable<typeof primitives[T]['moves']>,
-		owner: Number(!owner),
-	};
-}
-
-function clone(piece:Piece): typeof piece {
-	return {
-		...piece,
-	};
-}
-
-
-
-export const operations = {clone, naru, newPiece, capture};
-export { piecePrimitives, };
-export type { Piece, PieceFace, PieceBack, PieceLabel, PieceType, PieceNari, };

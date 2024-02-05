@@ -1,4 +1,7 @@
+import { useContext } from 'react';
+import { jin } from '../resources/util';
 import './Hex.css';
+import { GameContext } from './GameContext';
 
 interface Props {
 	q: number,
@@ -32,12 +35,16 @@ function Hex(props: Props) {
 		points.push([x, y]);
 	}
 
+	const { turn, } = useContext(GameContext);
 
+	let color
+	if (jin(turn[1], q, r))
+		color = 'cadetblue';
 
 	classNames = ['tile', ...classNames??[]];
 
 	return (
-		<g className={classNames.join(' ')} style={{translate: `${x}px ${y}px`}} >
+		<g className={classNames.join(' ')} style={{translate: `${x}px ${y}px`, '--base-fill':color}} >
 			<polygon
 				points={points.map(([x, y]) => `${x},${y}`).join(' ')}
 				onMouseEnter={() => {

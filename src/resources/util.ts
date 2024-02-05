@@ -41,7 +41,7 @@ class Enum {
 
 function jin (turn:Player, q:number, r:number) {
 	const {max, abs} = Math;
-	let sign = turn * -2 + 1;
+	let sign = turn * 2 - 1;
 	return (max(abs(q),abs(r),abs(q+r)) >= 3 && -(q+r) * sign >= 0 && r * sign <= 0)
 }
 

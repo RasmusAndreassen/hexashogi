@@ -1,63 +1,56 @@
-import { Piece, PieceBack, PieceFace, PieceType } from "./pieces";
+import * as P from "./pieces";
 
-type Coord = [q:number, r:number];
+export type Coord = [q:number, r:number];
 
-enum Player {
+export enum Player {
 	ou,
 	gyoku,
 }
 
-type TileAttributes = {
-	classNames: string[];
-	piece: null|Piece;
-}
 
-interface PieceState {
+export interface PieceState {
 	board: {
 		[q:number]: {
-			[r:number]: null|Piece;
+			[r:number]: null|P.Piece;
 		}
 	};
 	players: {
 		[P in Player]: {
 			king:Coord;
 			board:Coord[];
-			hand:Piece<false>[];
+			hand:P.type.Type[];
 		}
 	}
 }
 
 
-interface GameState {
+export interface GameState {
 	pieces: PieceState;
 	turn: Player;
 	moveCode: MoveCode;
 	ordinal: number;
 }
 
-interface Territory {
+export interface Territory {
 	area: Map<number,number|number[]>;
 	obstructed: boolean;
 }
 
 type Optional<T extends string> = T|"";
 
-type Move = [src?:Coord|number, dst?:Coord, captured?:Piece|null, uniq?:boolean, nari?:boolean]
+export type Move = [src?:Coord|number, dst?:Coord, captured?:P.Piece|null, uniq?:boolean, nari?:boolean]
 
-type MoveLabel = `${PieceFace}${Optional<'n'>}` | PieceBack;
+type MoveLabel = `${P.label.Face}${Optional<'n'>}` | P.label.Back;
 type MoveCoord = `${number},${number}`;
 
-type MoveSpace = `${MoveLabel}${Optional<`(${MoveCoord})`>}${MoveCoord}${Optional<"*">}`;
-type MovePlace = `${PieceFace}${MoveCoord}+`
+export type MoveSpace = `${MoveLabel}${Optional<`(${MoveCoord})`>}${MoveCoord}${Optional<"*">}`;
+export type MovePlace = `${P.label.Face}${MoveCoord}+`
                | `香車[${'i'|'-j'|'-k'}]${MoveCoord}+`;
 
-type MoveCode = MoveSpace
+export type MoveCode = MoveSpace
           | MovePlace;
 
-interface Action<P> {
+export interface Action<P> {
 	type: string;
 	payload: P;
 }
-
-export type { PieceState, MoveCode, Move, MovePlace, MoveSpace, TileAttributes, Territory, GameState, Coord, Action, };
-export { Player, };

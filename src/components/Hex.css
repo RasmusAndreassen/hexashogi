@@ -1,34 +1,30 @@
 .tile {
 	--base-fill: hsl(40, 100%, 87%);
-	--fill: var(--base-fill);
-	
+	fill: var(--base-fill);
 	&>polygon {
 		stroke: black;
 		stroke-width: 1;
-		fill: var(--fill);
 	}
-	
-	&.check{
-		--fill: hsl(0, 70%, 50%);
-	}
-	&.selected{
-		--fill: color-mix(in oklab, var(--base-fill), cyan);
-	}
-	&.checking .piece polygon{
-		stroke: hsl(0, 70%, 55%);
-		stroke-width: 5px;
-	}
-	
-	&.focus{
-		--fill: hsl(260, 70%, 50%);
-	}
-	
+
 	&:hover {
 		filter: hue-rotate(20);
 	}
 	
+	transition: fill 0.2s ease-in-out;
 	&.highlighted {
 		cursor: pointer;
-		--fill: hsl(56, 70%, 71%);
+		fill: color-mix(in oklab, var(--base-fill), hsl(56, 70%, 71%));
+		
+		
+		.piece {
+			pointer-events: none;
+		}
+		&:hover {
+			fill:color-mix(in oklab, var(--base-fill), hsl(36, 85%, 63%));
+			transition: fill 0.5s ease-in-out;
+			.piece>:is(polygon) {
+				animation:  threatened 0.8s ease-in-out infinite alternate;
+			}
+		}
 	}
 }

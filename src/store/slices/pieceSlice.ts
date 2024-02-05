@@ -3,51 +3,73 @@ import { createSlice } from "@reduxjs/toolkit";
 import { Piece, operations, } from "../../resources/pieces";
 import { PieceState, Coord, Player, } from "../../resources/types";
 import initial from "../../resources/initial";
+import { arrayEq } from "../../resources/util";
 
 interface Action<P> {
 	type: string;
 	payload: P;
 }
 
-type MoveAction<S extends Coord|number> = Action<{
-	piece:S extends number? Piece:Piece|undefined;
-	src:S;
+type MoveAction = Action<{
+	piece?:Piece;
+	src:Coord;
 	dst:Coord;
 }>
 
+type PlaceAction = Action<{
+	player:Player;
+	src:number;
+	dst:Coord;
+	piece?:Piece;
+}>
 
 export const pieceSlice = createSlice({
 	name: 'pieces',
 	initialState: start,
 	reducers: {
-		move(state, {payload}:MoveAction<Coord|number>) {
+		move(state, {payload}:MoveAction) {
 			const { board, players, } = state;
 
 			const { src, dst, } = payload;
 			let { piece, } = payload;
-
-			if (typeof src === 'number') {
-				piece = piece!;
-				players[piece.owner].hand.splice(src,1);
-			} else {
+			{
 				const [ q, r ] = src;
 				piece = piece ?? board[q][r]!;
 				board[q][r] = null;
+				let i = players[piece.owner].board.findIndex(pos => arrayEq(pos, src));
+				players[piece.owner].board[i] = dst;
 			}
-
 			const [ q, r ] = dst;
 			if (['O','G'].includes(piece.type))
 				players[piece.owner].king = [q,r];
 			const captured = board[q][r];
 
 			if (captured) {
-				let i = players[piece.owner].hand.length;
-				players[piece.owner].hand[i] = operations.capture(captured);
+				let i = players[captured.owner].board.findIndex(pos => arrayEq(pos,dst));
+				players[captured.owner].board.splice(i,1);
+				players[piece.owner].hand.push(captured.type);
 			}
 
 			board[q][r] = operations.clone(piece);
 
 		},
+
+		place(state, {payload}:PlaceAction) {
+			const { board, players, } = state;
+
+			const { player, src, dst, piece, } = payload;
+
+			const [ q, r ] = dst;
+
+			const [type] = players[player].hand.splice(src,1);
+
+
+			players[player].board.push(dst);
+
+			board[q][r] = piece ?? operations.newPiece(type, player);
+
+		},
+
 		override(state, {payload}:Action<PieceState>) {
 			const { board, players, } = payload
 			state.board = board;
@@ -68,7 +90,7 @@ function start(): PieceState {
 		[Player.ou]: {
 			king: [NaN,NaN],
 			board: [],
-			hand: [],
+			hand: ['o'],
 		},
 		[Player.gyoku]: {
 			king: [NaN,NaN],

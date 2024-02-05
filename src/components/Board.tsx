@@ -1,21 +1,38 @@
-import { Coord, Player, Move, TileAttributes, PieceState, } from "../resources/types";
+import { Coord, Player, Move, } from "../resources/types";
 
 import './Board.css';
 import Hex from "./Hex";
 import Piece from "./Piece";
-import { PieceNari, Piece as PieceT, operations } from "../resources/pieces";
+import * as P from "../resources/pieces";
 import { useDispatch, useSelector } from "react-redux";
 import { State } from "./App";
-import { useContext, useMemo } from "react";
+import { useContext, useMemo, } from "react";
 import { GameContext } from "./GameContext";
 import { pieceActions } from "../store/slices/pieceSlice";
+import { arrayEq, jin, mutate, } from "../resources/util";
+// import { BoardContext } from "./BoardContext";
+import { blocked, outeCheck, placable, territory } from "./memo";
 import { useImmer } from "use-immer";
-import { arrayEq, } from "../resources/util";
-import { BoardContext } from "./BoardContext";
-import { outeCheck, territory } from "./heavy";
+
+interface HexProps {
+	key: string;
+	q: number;
+	r: number;
+	classNames: Status[];
+	onClick?: () => void;
+};
+
+interface PieceProps {
+	piece: P.Piece;
+	position: Coord;
+	classNames: Status[];
+	onClick?: () => void;
+}
 
 interface Props {
-	setMove: (update:Move|((move:Move)=>void))=>void;
+	setMove: (producer:((move:Move)=>Move|void))=>void;
+	nextTurn: ()=>void;
+	finish: ()=>void;
 }
 
 const mode = {
@@ -24,158 +41,261 @@ const mode = {
 	4: 'nari'
 } as const;
 
-enum HiatusType {
+enum Hiatus {
+	none,
 	nari,
 	direction,
 }
 
-type Hiatus<T extends HiatusType> = {
+type Status = 'highlighted'|'canMove'|'threatening'|'selected'|'threatened';
+
+type HiatusState<T extends Hiatus = Hiatus> = 
+	T extends Hiatus.none? {
 	type: T;
-	piece: T extends HiatusType.direction? PieceT<false, 'o'>: PieceT<false, PieceNari>;
-	pos: Coord;
+} : T extends Hiatus.nari? {
+	type: T;
+	piece: P.type.Nari;
+} : {
+	type: T;
+	direction: 'i'|'-j'|'-k';
 }
 
-function Board({setMove}:Props) {
+function Board({setMove, nextTurn,}:Props) {
 	const { board, players } = useSelector<State, State['piece']>(state => state.piece);
-	const { turn, opposing, move, } = useContext(GameContext);
+	const { turn, move, } = useContext(GameContext);
+	const [ hiatus, setHiatus ] = useImmer<HiatusState>({type:Hiatus.none});
+	const [ current, opposing, ] = turn;
 	const dispatch = useDispatch();
-	const [ hiatus, setHiatus ] = useImmer<Hiatus<HiatusType>|undefined>(undefined);
 	
-	const threatening = useMemo(() =>
-		outeCheck(players[turn].king, players[opposing], board),
+	const threatening = useMemo(() => 
+		outeCheck(players[current].king, players[opposing], board),
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	[players, turn, board]);
 
 	const oute = threatening.length > 0;
 
-	const movable = useMemo(()=>
-		players[turn].board.filter(pos => territory(board, pos, oute, legal(pos, players, turn, opposing)).area.size > 0),
+	const movable = useMemo(() =>
+		players[current].board.filter(pos => territory(board, pos, oute, turn, players)?.length > 0),
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	[oute, players, turn, board]);
 
-	const range = useMemo(()=>{
-		if (move.length !== 1 || typeof move[0] === 'number')
-			return;
+	const range = useMemo(() => {
+		if (move.current.length !== 1)
+			return [];
+		const [current, opposing] = turn;
 
-		const pos = move[0] as Coord;
+		if (typeof move.current[0] === 'number') {
+			const i = move.current[0] as number;
+			const type = players[current].hand[i];
 
-		const res:Coord[] = [];
-		for (let [q, col] of territory(board, pos, oute, legal(pos, players, turn, opposing)).area.entries()) {
-			if (typeof col === 'number')
-				res.push([q,col]);
-			else
-			for (let r of col)
-				res.push([q,r]);
+			let predicate = (_:Coord) => true;
+
+			if (type === 'f') {
+				const __predicate = predicate;
+				predicate = (pos) => Object.values(board[pos[0]]).some(piece => !(piece?.owner === current && piece.type === 'f')) && __predicate(pos);
+			}
+			if (oute) {
+				const __predicate = predicate;
+				predicate = (pos) => outeCheck(players[current].king, players[opposing], board).length === 0 && __predicate(pos);
+			}
+			return placable(board, predicate);
+		} else {
+
+			const pos = move.current[0] as Coord;
+
+			return territory(board, pos, oute, turn, players);
 		}
-		return res;
+
 	}, [move, board, turn, oute, players]);
 
-	function makeHex(q:number, r:number, piece:PieceT|null) {
-		const hexProps = {
+	const richBoard = useMemo(() => {
+		const rB = mutate(board, (_, col) => 
+			mutate(col, (_, piece) =>
+				({piece, stati:[] as Status[]})
+			));
+
+		range.forEach(([q,r]) => {
+			rB[q][r].stati.push('highlighted');
+		});
+		movable.forEach(([q,r]) => {
+			rB[q][r].stati.push('canMove')
+		});
+		threatening.forEach(([q,r]) => {
+			rB[q][r].stati.push('threatening')
+		});
+
+		if (move.current[0] instanceof Array) {
+			const [q,r] = move.current[0];
+			rB[q][r].stati.push('selected')
+		}
+		if (threatening.length > 0) {
+			const [q,r] = players[current].king;
+			rB[q][r].stati.push('threatened');
+		}
+		return rB;
+
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [range, movable, threatening, move]);
+
+	function makeHex(q:number, r:number, piece:P.Piece|null, stati:Status[]) {
+		const hexProps:HexProps = {
 			key:`${q},${r}`,
 			q,
 			r,
-			classNames: [] as string[],
-			onClick: actions.clear as (()=>void)|undefined,
+			classNames: stati,
 		};
-		const pieceProps = {
+
+		const pieceProps:PieceProps = {
 			piece: piece!,
-			position:[q,r] as Coord,
-			classNames: [] as string[],
+			position: [q,r] as Coord,
+			classNames: stati,
 		};
 
-		if (range?.some(pos => arrayEq(pos, [q,r]))) {
-			hexProps.onClick = actions.move
-			hexProps.classNames.push('highlighted');
-		}
-		
-		if (arrayEq([q,r], move[0]!))
-			pieceProps.classNames.push('selected');
+		 if (hiatus.type) {
+			return hiatusHex(q,r,hexProps,pieceProps);
+		} else if (stati.includes('highlighted')) {
+			hexProps.onClick = () => {
+				actions.setDst(q,r);
+				const src = move.current[0]!;
 
-		if (hiatus) {
-			delete hexProps.onClick;
-			if (arrayEq([q,r], move[1]!)) {
-				const { piece, } = hiatus;
-				switch (hiatus.type) {
-					case HiatusType.nari:
-						const nari = operations.naru(piece);
-						classNames = [...classNames, 'selected'];
-						return (
-							<Hex {...hexProps}>
-								<Piece
-									piece={piece}
-									position={[q,r]}
-									classNames={['left']}
-									onClick={() => actions.nari(false)}
-									/>
-								<Piece
-									piece={nari}
-									position={[q,r]}
-									classNames={['right']}
-									onClick={() => actions.nari(true)}
-									/>
-							</Hex>
-						);
-					case HiatusType.direction:
-						return (
-							<Hex {...hexProps}>
-								<Piece
-									piece={piece}
-									position={[q,r]}
-									/>
-							</Hex>
-						);
-				}
-			} else if (hiatus.type === HiatusType.direction) {
-				let direction: 'i'|'-j'|'-k'|undefined;
-				const [bq, br] = move[1]!;
+				if (typeof src === "number") {
+					const type = players[current].hand[src];
+					
+					if (type === 'o') {
+						setHiatus({
+							type: Hiatus.direction,
+							direction: 'i',
+						});
+						return;
+					}
 
-				switch (`${bq-q},${br-r}`) {
-					case '0,-1': case  '0,1': direction =  'i'; break;
-					case '-1,0': case  '1,0': direction = '-j'; break;
-					case '1,-1': case '-1,1': direction = '-k'; break;
-				}
+					actions.place();
+				} else {
+					const [sq, sr] = src;
+					const piece = board[sq][sr]!;
 
-				if (direction) {
-					hexProps.onClick = actions.direct
-					return (
-						<Hex 
-							onHover={() => actions.updateDirection(direction!)}
-							{...hexProps}
-							>
-							{piece?<Piece {...pieceProps}/>:<></>}
-						</Hex>
-					);
+					if (P.operations.notNari(piece)
+					 && P.operations.canNari(piece)) {
+						if (blocked(board, [q,r], piece)) {
+							actions.move(P.operations.naru(piece));
+							return;
+						} else if
+							( jin(opposing, q, r)
+							||jin(opposing, sq, sr)) {
+							setHiatus({
+								type:Hiatus.nari,
+								piece:piece.type
+							});
+							return;
+						}
+					}
+
+					actions.move();
 				}
 			}
-			
-			return (
-				<Hex {...hexProps}>
-					{piece?
-						<Piece {...pieceProps}/>
-						:<></>}
-				</Hex>
-			);
 		
+		} else if (stati.includes('canMove')) {
+			pieceProps.onClick = () => actions.setSrc(q,r);
+		} else {
+			hexProps.onClick = actions.clear;
 		}
 
 		return (
 			<Hex 
 				{...hexProps}>
 				{piece?
-					<Piece 
-						onClick={() => {
-							if (piece.owner === turn)
-								actions.setSrc(q,r);
-						}}
-						{...pieceProps}/>
+				<Piece
+					{...pieceProps}/>
 					:<></>}
+			</Hex>
+		);
+	}
+
+	function hiatusHex(q:number, r:number, hexProps:HexProps, pieceProps:PieceProps) {
+		const pieceRepr = pieceProps.piece? <Piece {...pieceProps}/>: undefined
+		/** This is the tile preventing the move from being completed */
+		if (arrayEq([q,r], move.current[1]!)) {
+			switch (hiatus.type) {
+				case Hiatus.nari:{
+					const piece = P.operations.newPiece(hiatus.piece, current);
+					const nari = P.operations.naru(piece);
+					hexProps.classNames.push('selected');
+					return (
+						<Hex {...hexProps}>
+							<Piece
+								piece={piece}
+								position={[q,r]}
+								classNames={['left']}
+								onClick={() => actions.nari(false)}
+								/>
+							<Piece
+								piece={nari}
+								position={[q,r]}
+								classNames={['right']}
+								onClick={() => actions.nari(true)}
+								/>
+						</Hex>
+					);
+				}
+				case Hiatus.direction: {
+					const piece = P.operations.newPiece('o', current);
+					piece.direction = hiatus.direction;
+					return (
+						<Hex {...hexProps}>
+							<Piece
+								piece={piece}
+								position={[q,r]}
+								/>
+						</Hex>
+					);
+				}
+			}
+		} else if (hiatus.type === Hiatus.direction) {
+			let direction: 'i'|'-j'|'-k'|undefined;
+			const [pq, pr] = move.current[1]!;
+
+			const s = -1 + current * 2;
+
+			switch (`${q-pq},${r-pr}`) {
+				case  s+','+0 : direction = '-j'; break;
+				case  0+','+s: direction =  'i'; break;
+				case -s+','+s: direction = '-k'; break;
+			}
+
+			if (direction) {
+				hexProps.classNames.push('highlighted')
+				return (
+					<Hex 
+						{...hexProps}
+						onHover={() => actions.updateDirection(direction!)}
+						onClick = {() => {
+							const piece = P.operations.newPiece('o', current);
+							piece.direction = hiatus.direction;
+							actions.place(piece);
+							actions.resolveHiatus();
+						}}
+						>
+						{pieceRepr}
+					</Hex>
+				);
+			}
+		}
+		return (
+			<Hex {...hexProps}>
+				{pieceRepr}
 			</Hex>
 		);
 	}
 
 	const actions = {
 		setSrc(q_i:number,r?:number) {
-			const pos = r === undefined? q_i: [q_i,r] as Coord;
-			setMove([pos]);
+			let pos:number|Coord;
+			if (r === undefined) {
+				pos = q_i;
+			} else {
+				pos = [q_i,r] as Coord;
+			}
+			setMove(()=>[pos]);
 		},
 
 		setDst(q:number, r:number) {
@@ -185,48 +305,56 @@ function Board({setMove}:Props) {
 			});
 		},
 
-		move() {
-			const [src, dst, piece] = move;
+		move(piece?:P.Piece) {
+			const [src, dst] = move.current;
 			dispatch(pieceActions.move({
-				src: src!,
+				src: src as Coord,
 				dst: dst!,
-				piece: piece as Exclude<typeof piece, null>,
-			}))
+				piece,
+			}));
+			nextTurn();
+		},
+
+		place(piece?:P.Piece) {
+			const [src, dst] = move.current;
+			dispatch(pieceActions.place({
+				player: current,
+				src: src as number,
+				dst: dst!,
+				piece,
+			}));
+			nextTurn();
 		},
 
 		nari(choice:boolean) {
-			const src = move[0] as Coord;
-			const dst = move[1] as Coord;
-			let { piece, } = hiatus as Hiatus<HiatusType.nari>;
-			dispatch(pieceActions.move({
-				piece: choice? operations.naru(piece): piece,
-				src,
-				dst,
-			}))
+			const [q,r] = move.current[0] as Coord;
+			const piece = board[q][r] as P.Piece<false>;
+			actions.move(choice? P.operations.naru(piece): piece);
+			actions.resolveHiatus()
 		},
 
 		updateDirection(direction:'i'|'-j'|'-k') {
-			setHiatus((hiatus) => {
-				const { piece, } = hiatus as Hiatus<HiatusType.direction>;
-				piece.direction = direction;
-			})
-		},
-
-		direct() {
-			let { piece, } = hiatus as Hiatus<HiatusType.nari>;
-			setMove(move => move[2] = piece);
+			setHiatus(hiatus => {
+				(hiatus as HiatusState<Hiatus.direction>).direction = direction;
+			});
 		},
 
 		clear() {
-			setMove([]);
+			setMove(()=>[]);
 		},
+
+		resolveHiatus() {
+			setHiatus({type: Hiatus.none})
+		}
 	}
 
-	let selection = move[0];
+	let selection = move.current[0];
 
 	let classNames:string[] = [];
-	classNames.push(Player[turn]);
-	classNames.push(mode[move.length as 0|1|4]);
+	if (hiatus.type)
+		classNames.push(Hiatus[hiatus.type]);
+	classNames.push(Player[current]);
+	classNames.push(mode[move.current.length as 0|1|4]);
 
 	return (
 	<svg
@@ -235,52 +363,44 @@ function Board({setMove}:Props) {
 		viewBox='-380 -450 760 900'
 		onClick={actions.clear}
 		>
-		<BoardContext.Provider value={{threatening, movable}}>
+		{/* <BoardContext.Provider value={{threatening, movable}}> */}
 			<g id="content">
-				{Object.entries(board)
-					.flatMap(([q, item]) => {
+				{Object.entries(richBoard)
+					.flatMap(([q, col]) => {
 						q = Number(q);
-						return Object.entries(item)
-							.map(([r, piece]) => {
+						return Object.entries(col)
+							.map(([r, {piece, stati}]) => {
 								r = Number(r);
 
-								return makeHex(q, r, piece);
+								return makeHex(q, r, piece, stati);
 							});
 				})}
-				<g className={`hand ${Player[Number(!turn)]}`}>{
+				<g className={`hand ${Player[opposing]}`}>{
 					players[opposing]
-						.hand.map((piece, i) => 
+						.hand.map((type, i) => 
 							<Piece 
 								key={i}
 								position={i}
-								{...{piece}}
+								piece={P.operations.newPiece(type, opposing)}
 								/>
 						)
 				}</g>
-				<g className={`hand ${Player[turn]}`}>{
-					players[turn]
-						.hand.map((piece, i) => 
+				<g className={`hand ${Player[current]}`}>{
+					players[current]
+						.hand.map((type, i) => 
 							<Piece
 								key={i}
 								position={i}
 								onClick={() => actions.setSrc(i)}
 								classNames={i === selection?['selected']:undefined}
-								{...{piece}}
+								piece={P.operations.newPiece(type, current)}
 								/>
 						)
 				}</g>
 			</g>
-		</BoardContext.Provider>
+		{/* </BoardContext.Provider> */}
 	</svg>);
 
-}
-function legal (pos:Coord, players:PieceState['players'], turn:Player, opposing:Player) {
-	const [q, r] = pos;
-	return (board:PieceState['board']) => outeCheck(
-		players[turn].king,
-		players[opposing],
-		board,
-		['O','G'].includes(board[q][r]?.type!)).length > 0;
 }
 
 export default Board;

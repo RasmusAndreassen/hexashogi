@@ -1,9 +1,9 @@
-import { PieceType } from './pieces';
+import { type } from './pieces';
 import { Player } from './types';
-const initial: {
+const _initial: {
 	[q: number]: {
 		[r: number]: {
-			piece: PieceType,
+			piece: type.Type,
 			owner: Player,
 		}
 	}
@@ -206,6 +206,36 @@ const initial: {
 			owner: Player.ou,
 		}
 	}
+}
+
+const initial: {
+	[q: number]: {
+		[r: number]: {
+			piece: type.Type,
+			owner: Player,
+		}
+	}
+} = {
+	0: {
+		3: {
+			piece: 'K',
+			owner: Player.ou,
+		},
+	},
+	1: {
+		[-2]: {
+			piece: 'o',
+			owner: Player.ou
+		},
+		[-1]: {
+			piece: 'H',
+			owner: Player.gyoku
+		},
+		0: {
+			piece: 'G',
+			owner: Player.gyoku
+		},
+	},
 }
 
 export default initial;

@@ -1,30 +1,40 @@
+.piece>:where(polygon){
+	fill: var(--fill);
+	stroke-width: 2px;
+	stroke: var(--stroke);
+	filter: drop-shadow(1px 1px 2px rgba(125 80 52 / 0.781));
+}
+
 .piece {
 	rotate: var(--rotate);
+	transition-property: rotate, scale, transform;
+	transition-duration: 0.2s;
+	transition-timing-function: ease-in-out;
 	&[type="O"],
 	&[type="G"] {
 		scale: 1.2;
 	}
+
+	:is(.highlighted:hover &, &.threatened)>polygon {
+		animation:  threatened 0.8s ease-in-out infinite alternate;
+	}
+
 
 	&[type="K"],
 	&[type="H"] {
 		scale: 1.1;
 	}
 
-	&>polygon{
-		fill: hsl(32, 60%, 64%);
-		stroke-width: 2px;
-		stroke: hsl(32, 62%, 59%);
-		filter: drop-shadow(1px 1px 2px rgba(125, 80, 52, 0.781));
-	}
+	--fill: hsl(32 60% 64%);
+	--stroke: hsl(32, 58%, 57%);
 
-	.ou &.ou,
-	.gyoku &.gyoku {
+	#board.ou &.ou,
+	#board.gyoku &.gyoku {
 		cursor: pointer;
 	}
 
-	&.checking polygon{
-		stroke: hsl(0, 70%, 55%);
-		stroke-width: 5px;
+	&.threatening polygon{
+		filter: drop-shadow(1px 1px 3px firebrick);
 	}
 
 	&.immovable {
@@ -37,7 +47,7 @@
 		font-family: LigatureSymbols;
 		pointer-events: none;
 		text-anchor: middle;
-		alignment-baseline: central;
+		filter: none !important;
 	}
 
 	&.nari text{
@@ -47,7 +57,7 @@
 		fill: red;
 	}
 
-	.nari .selected & {
+	.nari .selected &:is(.left, .right) {
 		pointer-events: all !important;
 		cursor: pointer;
 		scale: 0.5;
@@ -67,14 +77,17 @@
 		}
 	}
 
-	#board:not(.directing):not(.nari) &.selected{
-		:is(&, & *) {
-			animation: hover 2s ease-in-out infinite alternate-reverse;
-		}
+
+	&.selected {
+		transition: transform 2s ease-in;
+		transform: translate(-1.5px, -2px) scale(1.04);
+		filter: drop-shadow(1px 1px 2px rgba(0, 0, 0, 0.781));
+		animation: levitate 2s ease-in-out 2s infinite alternate;
+
 		>polygon{
 			stroke: rgb(52, 123, 222);
 			stroke-width: 1.4px;
-			filter: drop-shadow(1px 1px 2px rgb(52 123 222 / 0.8));
+			/* filter: drop-shadow(1px 1px 2px rgb(52 123 222 / 0.8)); */
 		}
 	}
 
@@ -93,13 +106,16 @@
 	}
 }
 
-@keyframes hover {
-	from {
-		transform: translate(-1px, -1px) scale(1.04);
-	 }
-	 to {
-		/* returns the sun to its default position */
-		transform: translate(0) scale(1.02);
-	 }
-  
+@keyframes threatened {
+	to {
+		fill: color-mix(in srgb, var(--fill), red 30%);
+		stroke: rgb(140, 0, 0);
+	}
+}
+
+@keyframes levitate {
+	to {
+		transform: translate(-3px, -4px) scale(1.06);
+		filter: drop-shadow(4px 5px 1px rgba(0, 0, 0, 0.502));
+	}
 }
